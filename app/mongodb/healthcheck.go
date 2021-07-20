@@ -1,5 +1,14 @@
 package mongodb
 
-import "context"
+import (
+	"context"
+	"time"
 
-func HealthCheck(ctx context.Context)
+	"go.mongodb.org/mongo-driver/mongo/readpref"
+)
+
+func (hc *HealthChecker) check(ctx context.Context) (err error) {
+	ctx, done := context.WithTimeout(ctx, time.Second*5)
+	defer done()
+	return hc.client.Ping(ctx, readpref.PrimaryPreferred())
+}
