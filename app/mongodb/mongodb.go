@@ -11,19 +11,25 @@ import (
 )
 
 type HealthChecker struct {
-	client *mongo.Client
-	mu     *sync.RWMutex
-	state  *pkg.PublishMessage
-	ctx    context.Context
-	done   chan pkg.Done
+	client  *mongo.Client
+	mu      *sync.RWMutex
+	state   *pkg.PublishMessage
+	ctx     context.Context
+	done    chan pkg.Done
+	sigDone chan pkg.Done
 }
 
 func NewHealthChecker(ctx context.Context, client *mongo.Client) *HealthChecker {
+	if ctx == nil {
+		panic("nil context")
+	}
 	hc := &HealthChecker{
-		client: client,
-		mu:     &sync.RWMutex{},
-		state:  &pkg.PublishMessage{},
-		ctx:    ctx,
+		client:  client,
+		mu:      &sync.RWMutex{},
+		state:   &pkg.PublishMessage{},
+		ctx:     ctx,
+		done:    make(chan pkg.Done),
+		sigDone: make(chan pkg.Done),
 	}
 	go hc.loop()
 	return hc
@@ -44,6 +50,7 @@ func (hc *HealthChecker) loop() {
 	for {
 		select {
 		case <-hc.ctx.Done():
+			hc.sigDone <- pkg.Done{}
 			return
 		case <-ticker.C:
 			err := hc.check(hc.ctx)
@@ -62,8 +69,10 @@ func (hc *HealthChecker) loop() {
 	}
 }
 
+// Will not send exit signal until ctx.Done() is called.
 func (hc *HealthChecker) Close() <-chan pkg.Done {
 	go func() {
+		<-hc.sigDone
 		ctx, done := context.WithTimeout(context.Background(), time.Second*5)
 		defer done()
 		err := hc.client.Disconnect(ctx)
