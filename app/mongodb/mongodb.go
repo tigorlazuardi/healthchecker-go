@@ -2,6 +2,6 @@ package mongodb
 
 import "github.com/tigorlazuardi/healthchecker/pkg"
 
-type MongoDBHealthChecker struct {
+type HealthChecker struct {
 	client pkg.Doer
 }
